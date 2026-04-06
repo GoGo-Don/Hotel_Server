@@ -6,7 +6,7 @@ import {
   Coffee, Droplets, Bath, Sparkles, AlarmClock, Monitor,
   UtensilsCrossed, Phone, Wifi, HelpCircle,
 } from "lucide-react";
-import { supabase, fetchActiveRequests, fetchTodayRequests, resolveRequest } from "@/lib/supabase";
+import { supabase, fetchMyRequests, fetchTodayRequests, resolveRequest } from "@/lib/supabase";
 
 import { type ServiceRequest } from "@/lib/types";
 
@@ -111,43 +111,52 @@ export default function StaffDashboard() {
     return () => clearInterval(interval);
   }, []);
 
-  // Load requests based on active filter
+  // Load requests — active shows only my assigned tasks; all shows today's completed too
   const loadRequests = useCallback(async () => {
-    const data =
-      filter === "all" ? await fetchTodayRequests() : await fetchActiveRequests();
-    setRequests(sortRequests(data));
-  }, [filter]);
+    if (loading || !staffName) return;
+    if (filter === "all") {
+      const data = await fetchTodayRequests();
+      // Show only rows assigned to me in "all today" view
+      setRequests(sortRequests(data.filter((r) => r.assigned_to === staffName)));
+    } else {
+      const data = await fetchMyRequests(staffName);
+      setRequests(sortRequests(data));
+    }
+  }, [filter, staffName, loading]);
 
   useEffect(() => {
     if (!loading) loadRequests();
   }, [loading, loadRequests]);
 
-  // Realtime subscription
+  // Realtime — watch for assignments (UPDATEs where assigned_to becomes me) and completions
   useEffect(() => {
-    if (loading) return;
+    if (loading || !staffName) return;
 
     const channel = supabase
-      .channel("requests-realtime")
+      .channel("staff-realtime")
       .on(
         "postgres_changes",
-        { event: "*", schema: "public", table: "requests" },
+        { event: "UPDATE", schema: "public", table: "requests" },
         (payload) => {
           const updated = payload.new as ServiceRequest;
-
-          if (payload.eventType === "INSERT") {
-            setRequests((prev) => sortRequests([updated, ...prev]));
-            // Play alert only if sound is enabled
-            if (soundEnabled) {
-              try {
-                if (!audioRef.current) {
-                  audioRef.current = new Audio("/alert.wav");
-                }
-                audioRef.current.play().catch(() => {});
-              } catch {}
-            }
-          }
-
-          if (payload.eventType === "UPDATE") {
+          // A task was just assigned to me — add it
+          if (updated.assigned_to === staffName && updated.status === "in_progress") {
+            setRequests((prev) => {
+              const exists = prev.some((r) => r.id === updated.id);
+              const next = exists
+                ? prev.map((r) => (r.id === updated.id ? updated : r))
+                : [updated, ...prev];
+              // Play alert on new assignment
+              if (!exists && soundEnabled) {
+                try {
+                  if (!audioRef.current) audioRef.current = new Audio("/alert.wav");
+                  audioRef.current.play().catch(() => {});
+                } catch {}
+              }
+              return sortRequests(next);
+            });
+          } else {
+            // Task was resolved or reassigned away — remove or update
             setRequests((prev) =>
               sortRequests(prev.map((r) => (r.id === updated.id ? updated : r)))
             );
@@ -156,10 +165,8 @@ export default function StaffDashboard() {
       )
       .subscribe();
 
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [loading, soundEnabled]);
+    return () => { supabase.removeChannel(channel); };
+  }, [loading, staffName, soundEnabled]);
 
   const handleResolve = async (id: string) => {
     setRequests((prev) =>
@@ -256,8 +263,9 @@ export default function StaffDashboard() {
       {/* Request list */}
       <section className="p-4 space-y-3 pb-20">
         {visibleRequests.length === 0 ? (
-          <div className="text-center text-stone-400 text-sm py-16">
-            {filter === "active" ? "No active requests." : "No requests yet today."}
+          <div className="text-center text-stone-400 text-sm py-16 space-y-1">
+            <p>{filter === "active" ? "No tasks assigned to you right now." : "No completed tasks today."}</p>
+            {filter === "active" && <p className="text-xs text-stone-300">Waiting for the manager to assign tasks.</p>}
           </div>
         ) : (
           visibleRequests.map((req) => (

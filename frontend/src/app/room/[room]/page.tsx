@@ -406,12 +406,23 @@ export default function RoomPage({
   return (
     <main className="min-h-screen bg-[#F3F5F8] flex flex-col">
       {/* Header */}
-      <header className="bg-white border-b-[3px] border-brand-400 px-5 py-4 shadow-sm sticky top-0 z-10 flex items-center justify-between">
-        <p className="text-base leading-none">
-          <span className="font-bold text-stone-900">TeaCorp</span>
-          <span className="text-brand-400"> Hotels</span>
-        </p>
-        <p className="text-sm text-stone-400 font-medium">Room {room}</p>
+      <header className="bg-white border-b-[3px] border-brand-400 px-5 pt-4 pb-3 shadow-sm sticky top-0 z-10">
+        <div className="flex items-center justify-between">
+          <p className="text-xs font-medium text-stone-400 uppercase tracking-widest">
+            TeaCorp Hotels
+          </p>
+          <p className="text-xs font-medium text-stone-400 uppercase tracking-widest">
+            Bangalore
+          </p>
+        </div>
+        <div className="flex items-end justify-between mt-1">
+          <p className="text-2xl font-bold text-stone-900 leading-tight tracking-tight">
+            Room {room}
+          </p>
+          <span className="text-[10px] font-medium text-brand-400 uppercase tracking-wide bg-brand-50 px-2 py-1 rounded-full">
+            Guest
+          </span>
+        </div>
       </header>
 
       {/* Scrollable content */}

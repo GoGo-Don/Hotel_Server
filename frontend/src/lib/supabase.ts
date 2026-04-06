@@ -54,6 +54,38 @@ export async function insertRequest(
   }
 }
 
+// Requests assigned to a specific staff member (active only)
+export async function fetchMyRequests(staffName: string): Promise<ServiceRequest[]> {
+  const { data, error } = await getSupabase()
+    .from("requests")
+    .select("*")
+    .eq("assigned_to", staffName)
+    .in("status", ["in_progress"])
+    .order("created_at", { ascending: true });
+
+  if (error) {
+    console.error("fetchMyRequests:", error.message);
+    return [];
+  }
+  return (data ?? []) as ServiceRequest[];
+}
+
+// Unassigned pending requests (for manager assignment queue)
+export async function fetchUnassignedRequests(): Promise<ServiceRequest[]> {
+  const { data, error } = await getSupabase()
+    .from("requests")
+    .select("*")
+    .eq("status", "pending")
+    .is("assigned_to", null)
+    .order("created_at", { ascending: true });
+
+  if (error) {
+    console.error("fetchUnassignedRequests:", error.message);
+    return [];
+  }
+  return (data ?? []) as ServiceRequest[];
+}
+
 export async function fetchActiveRequests(): Promise<ServiceRequest[]> {
   const { data, error } = await supabase
     .from("requests")
