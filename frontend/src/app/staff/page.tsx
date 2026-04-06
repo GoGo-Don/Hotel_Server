@@ -1,8 +1,18 @@
 "use client";
 
 import { useEffect, useState, useCallback, useRef } from "react";
-import { supabase, fetchActiveRequests, fetchTodayRequests, assignRequest, resolveRequest } from "@/lib/supabase";
+import {
+  type LucideIcon,
+  Coffee, Droplets, Bath, Sparkles, AlarmClock, Monitor,
+  UtensilsCrossed, Phone, Wifi, HelpCircle,
+} from "lucide-react";
+import { supabase, fetchActiveRequests, fetchTodayRequests, resolveRequest } from "@/lib/supabase";
+
 import { type ServiceRequest } from "@/lib/types";
+
+const ICON_MAP: Record<string, LucideIcon> = {
+  Coffee, Droplets, Bath, Sparkles, AlarmClock, Monitor, UtensilsCrossed, Phone, Wifi,
+};
 import { StatusBadge } from "@/components/StatusBadge";
 import { useAuthSession } from "@/lib/hooks/useAuthSession";
 import { timeAgo, isOverdue, getConfig } from "@/lib/utils";
@@ -23,14 +33,10 @@ function sortRequests(list: ServiceRequest[]): ServiceRequest[] {
 function RequestCard({
   req,
   tick,
-  staffName,
-  onClaim,
   onResolve,
 }: {
   req: ServiceRequest;
   tick: number;
-  staffName: string;
-  onClaim: (id: string) => void;
   onResolve: (id: string) => void;
 }) {
   void tick; // used to trigger re-render for timeAgo freshness
@@ -47,7 +53,9 @@ function RequestCard({
       {/* Top row */}
       <div className="flex items-start justify-between gap-2">
         <div className="flex items-center gap-2">
-          <span className="text-2xl">{config?.icon ?? "📋"}</span>
+          <span className="w-10 h-10 rounded-xl bg-brand-50 flex items-center justify-center shrink-0">
+              {(() => { const I = ICON_MAP[config?.icon ?? ""] ?? HelpCircle; return <I size={20} strokeWidth={1.5} className="text-brand-400" />; })()}
+            </span>
           <div>
             <p className="font-semibold text-stone-800 text-sm">{config?.label ?? req.type}</p>
             <p className="text-stone-400 text-xs">Room {req.room}</p>
@@ -72,29 +80,19 @@ function RequestCard({
       {/* Assigned to */}
       {req.assigned_to && (
         <p className="text-xs text-stone-400">
-          Claimed by <strong className="text-stone-600">{req.assigned_to}</strong>
+          Assigned to <strong className="text-stone-600">{req.assigned_to}</strong>
         </p>
       )}
 
       {/* Actions */}
-      <div className="flex gap-2">
-        {req.status === "pending" && (
-          <button
-            onClick={() => onClaim(req.id)}
-            className="flex-1 text-sm bg-brand-400 hover:bg-brand-500 text-white font-medium py-2 rounded-xl transition-colors"
-          >
-            Claim
-          </button>
-        )}
-        {(req.status === "pending" || req.status === "in_progress") && (
-          <button
-            onClick={() => onResolve(req.id)}
-            className="flex-1 text-sm bg-green-600 hover:bg-green-700 text-white font-medium py-2 rounded-xl transition-colors"
-          >
-            Done
-          </button>
-        )}
-      </div>
+      {(req.status === "pending" || req.status === "in_progress") && (
+        <button
+          onClick={() => onResolve(req.id)}
+          className="w-full text-sm bg-green-600 hover:bg-green-700 text-white font-medium py-2 rounded-xl transition-colors"
+        >
+          Done
+        </button>
+      )}
     </div>
   );
 }
@@ -162,17 +160,6 @@ export default function StaffDashboard() {
       supabase.removeChannel(channel);
     };
   }, [loading, soundEnabled]);
-
-  const handleClaim = async (id: string) => {
-    setRequests((prev) =>
-      sortRequests(
-        prev.map((r) =>
-          r.id === id ? { ...r, status: "in_progress", assigned_to: staffName } : r
-        )
-      )
-    );
-    await assignRequest(id, staffName);
-  };
 
   const handleResolve = async (id: string) => {
     setRequests((prev) =>
@@ -278,8 +265,6 @@ export default function StaffDashboard() {
               key={req.id}
               req={req}
               tick={tick}
-              staffName={staffName}
-              onClaim={handleClaim}
               onResolve={handleResolve}
             />
           ))

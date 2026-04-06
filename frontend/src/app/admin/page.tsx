@@ -2,12 +2,21 @@
 
 import { useEffect, useState, useCallback } from "react";
 import {
+  type LucideIcon,
+  Coffee, Droplets, Bath, Sparkles, AlarmClock, Monitor,
+  UtensilsCrossed, Phone, Wifi, HelpCircle,
+} from "lucide-react";
+import {
   supabase,
   fetchTodayRequests,
   assignRequest,
   resolveRequest,
   fetchStats,
 } from "@/lib/supabase";
+
+const ICON_MAP: Record<string, LucideIcon> = {
+  Coffee, Droplets, Bath, Sparkles, AlarmClock, Monitor, UtensilsCrossed, Phone, Wifi,
+};
 import {
   type ServiceRequest,
   type AdminStats,
@@ -69,7 +78,9 @@ function ActiveRequestRow({
       {/* Top */}
       <div className="flex items-start justify-between gap-2">
         <div className="flex items-center gap-2">
-          <span className="text-xl">{config?.icon ?? "📋"}</span>
+          <span className="w-8 h-8 rounded-lg bg-brand-50 flex items-center justify-center shrink-0">
+              {(() => { const I = ICON_MAP[config?.icon ?? ""] ?? HelpCircle; return <I size={16} strokeWidth={1.5} className="text-brand-400" />; })()}
+            </span>
           <div>
             <p className="font-semibold text-stone-800 text-sm">{config?.label ?? req.type}</p>
             <p className="text-stone-400 text-xs">Room {req.room}</p>
@@ -125,7 +136,9 @@ function CompletedRow({ req }: { req: ServiceRequest }) {
   return (
     <div className="flex items-center justify-between px-4 py-3 bg-white rounded-xl border border-stone-100 gap-3">
       <div className="flex items-center gap-2 min-w-0">
-        <span className="text-base">{config?.icon ?? "📋"}</span>
+        <span className="w-7 h-7 rounded-lg bg-brand-50 flex items-center justify-center shrink-0">
+            {(() => { const I = ICON_MAP[config?.icon ?? ""] ?? HelpCircle; return <I size={14} strokeWidth={1.5} className="text-brand-400" />; })()}
+          </span>
         <div className="min-w-0">
           <p className="text-sm font-medium text-stone-700 truncate">{config?.label ?? req.type}</p>
           <p className="text-xs text-stone-400">Room {req.room}</p>
