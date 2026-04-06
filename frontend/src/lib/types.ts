@@ -53,14 +53,37 @@ export const REQUEST_TYPES: RequestTypeConfig[] = [
   },
   {
     type: "reception_callback",
-    label: "Call Me Back",
+    label: "Reception Callback",
     icon: "📞",
-    description: "Reception will call your room",
-  },
-  {
-    type: "maintenance",
-    label: "Maintenance",
-    icon: "🔧",
-    description: "Report a technical issue",
+    description: "We'll call your room within 5 minutes.",
   },
 ];
+
+// Kept for display of legacy DB rows — not shown on guest page
+export const LEGACY_REQUEST_TYPES: RequestTypeConfig[] = [
+  {
+    type: "maintenance" as RequestType,
+    label: "Maintenance",
+    icon: "🔧",
+    description: "Technical issue reported",
+  },
+];
+
+// Staff roster shown in admin assignment dropdown.
+// Edit this list to match your hotel's team.
+export const STAFF_ROSTER = [
+  "Reception",
+  "Maria H.",
+  "John K.",
+  "Anna R.",
+  "Sam T.",
+  "Night Manager",
+];
+
+export interface AdminStats {
+  total: number;
+  pending: number;
+  inProgress: number;
+  done: number;
+  avgCompletionMins: number;
+}

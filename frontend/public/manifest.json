@@ -1,6 +1,6 @@
 {
-  "name": "Hotel Services",
-  "short_name": "Services",
+  "name": "Grand Stay Hotel",
+  "short_name": "Grand Stay",
   "description": "Request room services from your hotel room",
   "start_url": "/",
   "display": "standalone",

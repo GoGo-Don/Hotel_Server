@@ -2,8 +2,8 @@
 
 import { useEffect, useState, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { supabase, fetchActiveRequests, claimRequest, resolveRequest } from "@/lib/supabase";
-import { type ServiceRequest, REQUEST_TYPES } from "@/lib/types";
+import { supabase, fetchActiveRequests, fetchTodayRequests, claimRequest, resolveRequest } from "@/lib/supabase";
+import { type ServiceRequest, REQUEST_TYPES, LEGACY_REQUEST_TYPES } from "@/lib/types";
 
 function timeAgo(dateStr: string): string {
   const diff = Math.floor((Date.now() - new Date(dateStr).getTime()) / 1000);
@@ -14,6 +14,19 @@ function timeAgo(dateStr: string): string {
 
 function isOverdue(dateStr: string): boolean {
   return Date.now() - new Date(dateStr).getTime() > 10 * 60 * 1000; // 10 minutes
+}
+
+function sortRequests(list: ServiceRequest[]): ServiceRequest[] {
+  // Overdue pending first (oldest first within group), then rest by created_at ascending
+  const overdue = list.filter(
+    (r) => r.status === "pending" && isOverdue(r.created_at)
+  ).sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+
+  const rest = list.filter(
+    (r) => !(r.status === "pending" && isOverdue(r.created_at))
+  ).sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+
+  return [...overdue, ...rest];
 }
 
 function RequestCard({
@@ -27,7 +40,7 @@ function RequestCard({
   onClaim: (id: string) => void;
   onResolve: (id: string) => void;
 }) {
-  const config = REQUEST_TYPES.find((r) => r.type === req.type);
+  const config = [...REQUEST_TYPES, ...LEGACY_REQUEST_TYPES].find((r) => r.type === req.type);
   const overdue = req.status === "pending" && isOverdue(req.created_at);
 
   return (
@@ -117,6 +130,7 @@ export default function StaffDashboard() {
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<"active" | "all">("active");
   const [tick, setTick] = useState(0); // force re-render for timeAgo
+  const [soundEnabled, setSoundEnabled] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
   // Re-render every 30s so relative timestamps stay fresh
@@ -125,23 +139,29 @@ export default function StaffDashboard() {
     return () => clearInterval(interval);
   }, []);
 
-  // Auth check
+  // Auth check — Item 8: format display name from email
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (!session) {
         router.push("/staff/login");
       } else {
-        setStaffName(session.user.email?.split("@")[0] ?? "Staff");
+        const raw = session.user.email?.split("@")[0] ?? "Staff";
+        const name = raw
+          .split(/[._-]/)
+          .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+          .join(" ");
+        setStaffName(name);
         setLoading(false);
       }
     });
   }, [router]);
 
-  // Initial fetch
+  // Load requests based on active filter
   const loadRequests = useCallback(async () => {
-    const data = await fetchActiveRequests();
-    setRequests(data);
-  }, []);
+    const data =
+      filter === "all" ? await fetchTodayRequests() : await fetchActiveRequests();
+    setRequests(sortRequests(data));
+  }, [filter]);
 
   useEffect(() => {
     if (!loading) loadRequests();
@@ -160,24 +180,21 @@ export default function StaffDashboard() {
           const updated = payload.new as ServiceRequest;
 
           if (payload.eventType === "INSERT") {
-            setRequests((prev) => [updated, ...prev]);
-            // Play alert — create lazily to satisfy autoplay policies
-            try {
-              if (!audioRef.current) {
-                audioRef.current = new Audio(
-                  "data:audio/wav;base64,UklGRl9vT19XQVZFZm10IBAAAA" +
-                  // Minimal beep tone encoded inline so no file is needed
-                  "EAABAAEARAAAAA" +
-                  "AQAABAAMAAAA"
-                );
-              }
-              audioRef.current.play().catch(() => {});
-            } catch {}
+            setRequests((prev) => sortRequests([updated, ...prev]));
+            // Play alert only if sound is enabled
+            if (soundEnabled) {
+              try {
+                if (!audioRef.current) {
+                  audioRef.current = new Audio("/alert.wav");
+                }
+                audioRef.current.play().catch(() => {});
+              } catch {}
+            }
           }
 
           if (payload.eventType === "UPDATE") {
             setRequests((prev) =>
-              prev.map((r) => (r.id === updated.id ? updated : r))
+              sortRequests(prev.map((r) => (r.id === updated.id ? updated : r)))
             );
           }
         }
@@ -187,12 +204,14 @@ export default function StaffDashboard() {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [loading]);
+  }, [loading, soundEnabled]);
 
   const handleClaim = async (id: string) => {
     setRequests((prev) =>
-      prev.map((r) =>
-        r.id === id ? { ...r, status: "in_progress", assigned_to: staffName } : r
+      sortRequests(
+        prev.map((r) =>
+          r.id === id ? { ...r, status: "in_progress", assigned_to: staffName } : r
+        )
       )
     );
     await claimRequest(id, staffName);
@@ -200,7 +219,7 @@ export default function StaffDashboard() {
 
   const handleResolve = async (id: string) => {
     setRequests((prev) =>
-      prev.map((r) => (r.id === id ? { ...r, status: "done" } : r))
+      sortRequests(prev.map((r) => (r.id === id ? { ...r, status: "done" } : r)))
     );
     await resolveRequest(id);
   };
@@ -224,15 +243,16 @@ export default function StaffDashboard() {
       : requests;
 
   const pendingCount = requests.filter((r) => r.status === "pending").length;
+  const overdueCount = requests.filter(
+    (r) => r.status === "pending" && isOverdue(r.created_at)
+  ).length;
 
   return (
     <main className="min-h-screen bg-stone-100">
       {/* Header */}
       <header className="bg-brand-700 text-white px-5 py-4 flex items-center justify-between shadow-md sticky top-0 z-10">
         <div>
-          <p className="text-brand-200 text-xs uppercase tracking-widest font-medium">
-            Staff Dashboard
-          </p>
+          <p className="text-brand-200 text-xs font-medium">Grand Stay Hotel</p>
           <h1 className="text-lg font-bold flex items-center gap-2">
             Requests
             {pendingCount > 0 && (
@@ -243,6 +263,17 @@ export default function StaffDashboard() {
           </h1>
         </div>
         <div className="flex items-center gap-3">
+          {/* Sound toggle — Item 4 */}
+          <button
+            onClick={() => setSoundEnabled((v) => !v)}
+            title={soundEnabled ? "Sound alerts on" : "Sound alerts off"}
+            className={`text-lg transition-opacity ${soundEnabled ? "opacity-100" : "opacity-40"}`}
+          >
+            🔔
+          </button>
+          <a href="/admin" className="text-xs text-brand-200 hover:text-white transition-colors hidden sm:block">
+            Admin
+          </a>
           <span className="text-brand-200 text-xs hidden sm:block">{staffName}</span>
           <button
             onClick={handleSignOut}
@@ -261,6 +292,11 @@ export default function StaffDashboard() {
             ${filter === "active" ? "bg-brand-600 text-white" : "bg-white text-stone-600 border border-stone-200"}`}
         >
           Active
+          {overdueCount > 0 && filter === "active" && (
+            <span className="ml-1.5 bg-red-500 text-white text-xs font-bold rounded-full px-1.5 py-0.5">
+              {overdueCount} overdue
+            </span>
+          )}
         </button>
         <button
           onClick={() => setFilter("all")}

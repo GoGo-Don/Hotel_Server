@@ -1,0 +1,62 @@
+[18:32:23.398] === GUEST PAGE ===
+[18:32:25.597]   screenshot → tests/screenshots/01_guest_initial.png
+[18:32:25.602]   title: Hotel Services
+[18:32:25.603]   url:   http://localhost:3000/room/204
+[18:32:25.617]   found 11 button(s)
+[18:32:25.617] 
+=== CLICKING SERVICE BUTTONS ===
+[18:32:26.879] 
+  [1] Clicking 'Water' (water)
+[18:32:29.546]        banner: (no banner visible)
+[18:32:29.671]   screenshot → tests/screenshots/02_guest_click_01_water.png
+[18:32:29.671]   [1b] Clicking 'Water' AGAIN (duplicate test)
+[18:32:32.739]          duplicate banner: (no banner)
+[18:32:32.868]   screenshot → tests/screenshots/02_guest_click_01_water_duplicate.png
+[18:32:34.105] 
+  [2] Clicking 'Towels' (towels)
+[18:32:36.690]        banner: (no banner visible)
+[18:32:36.834]   screenshot → tests/screenshots/02_guest_click_02_towels.png
+[18:32:38.078] 
+  [3] Clicking 'Room Cleaning' (cleaning)
+[18:32:40.693]        banner: (no banner visible)
+[18:32:40.802]   screenshot → tests/screenshots/02_guest_click_03_cleaning.png
+[18:32:42.050] 
+  [4] Clicking 'Extra Pillows' (extra_pillows)
+[18:32:44.636]        banner: (no banner visible)
+[18:32:44.781]   screenshot → tests/screenshots/02_guest_click_04_extra_pillows.png
+[18:32:46.022] 
+  [5] Clicking 'Reception Callback' (reception_callback)
+[18:32:48.614]        banner: (no banner visible)
+[18:32:48.770]   screenshot → tests/screenshots/02_guest_click_05_reception_callback.png
+[18:32:48.771] 
+=== OVERDUE SORTING NOTE ===
+[18:32:48.771]   Overdue sorting code is in place — verify manually by waiting 10+ minutes
+[18:32:48.771]   after submitting a request, or by using the Supabase dashboard to backdate
+[18:32:48.771]   a created_at timestamp. The Active tab will show a red 'N overdue' badge
+[18:32:48.771]   on the tab label, and overdue cards will appear at the top with red borders.
+[18:32:48.771] 
+=== STAFF LOGIN ===
+[18:32:50.221]   screenshot → tests/screenshots/03_staff_login_empty.png
+[18:32:50.428]   screenshot → tests/screenshots/03_staff_login_filled.png
+[18:32:52.889]   logged in — url: http://localhost:3000/staff
+[18:32:53.047]   screenshot → tests/screenshots/04_staff_dashboard.png
+[18:32:53.047] 
+=== STAFF DASHBOARD ===
+[18:32:53.053]   visible request cards: 5
+[18:32:53.061]   card 1: 💧 |  | Water |  | Room 204 |  | Pending |  | 23s ago |  | Claim | Done
+[18:32:53.066]   card 2: 🛁 |  | Towels |  | Room 204 |  | Pending |  | 16s ago |  | Claim | Done
+[18:32:53.070]   card 3: 🧹 |  | Room Cleaning |  | Room 204 |  | Pending |  | 12s ago |  | Claim | Done
+[18:32:53.074]   card 4: 🛏️ |  | Extra Pillows |  | Room 204 |  | Pending |  | 8s ago |  | Claim | Done
+[18:32:53.079]   card 5: 📞 |  | Reception Callback |  | Room 204 |  | Pending |  | 4s ago |  | Claim | Done
+[18:32:54.650]   screenshot → tests/screenshots/04_staff_dashboard_all_today.png
+[18:32:54.658] 
+  Claiming first pending request...
+[18:32:56.920]   screenshot → tests/screenshots/05_staff_after_claim.png
+[18:32:56.920]   Claimed.
+[18:32:56.928]   Marking as Done...
+[18:32:59.099]   screenshot → tests/screenshots/06_staff_after_done.png
+[18:32:59.100]   Done.
+[18:32:59.100] 
+=== CONSOLE ERRORS (2) ===
+[18:32:59.100]   [error] Failed to load resource: the server responded with a status of 404 (Not Found)
+[18:32:59.100]   [error] Failed to load resource: the server responded with a status of 409 ()
