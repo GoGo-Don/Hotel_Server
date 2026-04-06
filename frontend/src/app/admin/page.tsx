@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { useRouter } from "next/navigation";
 import {
   supabase,
   fetchTodayRequests,
@@ -12,32 +11,18 @@ import {
 import {
   type ServiceRequest,
   type AdminStats,
-  REQUEST_TYPES,
-  LEGACY_REQUEST_TYPES,
   STAFF_ROSTER,
 } from "@/lib/types";
+import { StatusBadge } from "@/components/StatusBadge";
+import { useAuthSession } from "@/lib/hooks/useAuthSession";
+import { timeAgo, isOverdue, getConfig } from "@/lib/utils";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
-
-function timeAgo(dateStr: string): string {
-  const diff = Math.floor((Date.now() - new Date(dateStr).getTime()) / 1000);
-  if (diff < 60) return `${diff}s ago`;
-  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
-  return `${Math.floor(diff / 3600)}h ${Math.floor((diff % 3600) / 60)}m ago`;
-}
 
 function duration(createdAt: string, updatedAt: string): string {
   const ms = new Date(updatedAt).getTime() - new Date(createdAt).getTime();
   if (ms < 60000) return `${Math.round(ms / 1000)}s`;
   return `${Math.round(ms / 60000)}m`;
-}
-
-function isOverdue(dateStr: string): boolean {
-  return Date.now() - new Date(dateStr).getTime() > 10 * 60 * 1000;
-}
-
-function getConfig(type: string) {
-  return [...REQUEST_TYPES, ...LEGACY_REQUEST_TYPES].find((r) => r.type === type);
 }
 
 // ─── Stat card ────────────────────────────────────────────────────────────────
@@ -158,32 +143,12 @@ function CompletedRow({ req }: { req: ServiceRequest }) {
   );
 }
 
-function StatusBadge({ status }: { status: ServiceRequest["status"] }) {
-  const styles: Record<ServiceRequest["status"], string> = {
-    pending: "bg-brand-100 text-brand-700",
-    in_progress: "bg-amber-100 text-amber-700",
-    done: "bg-green-100 text-green-700",
-  };
-  const labels: Record<ServiceRequest["status"], string> = {
-    pending: "Pending",
-    in_progress: "In Progress",
-    done: "Done",
-  };
-  return (
-    <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${styles[status]}`}>
-      {labels[status]}
-    </span>
-  );
-}
-
 // ─── Main page ────────────────────────────────────────────────────────────────
 
 export default function AdminDashboard() {
-  const router = useRouter();
+  const { name: adminName, loading } = useAuthSession();
   const [requests, setRequests] = useState<ServiceRequest[]>([]);
   const [stats, setStats] = useState<AdminStats | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [adminName, setAdminName] = useState("Admin");
   const [tick, setTick] = useState(0);
 
   // Refresh timestamps every 30s
@@ -191,20 +156,6 @@ export default function AdminDashboard() {
     const id = setInterval(() => setTick((t) => t + 1), 30_000);
     return () => clearInterval(id);
   }, []);
-
-  // Auth check
-  useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (!session) {
-        router.push("/staff/login");
-      } else {
-        const raw = session.user.email?.split("@")[0] ?? "Admin";
-        const name = raw.split(/[._-]/).map((w: string) => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
-        setAdminName(name);
-        setLoading(false);
-      }
-    });
-  }, [router]);
 
   const refresh = useCallback(async () => {
     const [data, s] = await Promise.all([fetchTodayRequests(), fetchStats()]);
@@ -229,17 +180,11 @@ export default function AdminDashboard() {
   }, [loading, refresh]);
 
   const handleAssign = async (id: string, staffName: string) => {
-    setRequests((prev) =>
-      prev.map((r) => r.id === id ? { ...r, assigned_to: staffName, status: "in_progress" } : r)
-    );
     await assignRequest(id, staffName);
     await refresh();
   };
 
   const handleDone = async (id: string) => {
-    setRequests((prev) =>
-      prev.map((r) => r.id === id ? { ...r, status: "done" } : r)
-    );
     await resolveRequest(id);
     await refresh();
   };
@@ -267,17 +212,19 @@ export default function AdminDashboard() {
     return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
   });
 
+  // suppress unused warning — tick used to keep timestamps fresh via re-render
+  void tick;
+
   return (
-    <main className="min-h-screen bg-stone-100">
+    <main className="min-h-screen bg-[#F3F5F8]">
       {/* Header */}
-      <header className="bg-brand-900 text-white px-5 py-4 flex items-center justify-between shadow-md sticky top-0 z-10"
-        style={{ backgroundColor: "#3d2a0c" }}>
+      <header className="bg-white border-b-[3px] border-brand-400 px-5 py-4 flex items-center justify-between sticky top-0 z-10 shadow-sm">
         <div>
-          <p className="text-brand-200 text-xs font-medium" style={{ color: "#c9973a" }}>
-            Grand Stay Hotel
-          </p>
+          <p className="text-[10px] font-medium text-stone-400 uppercase tracking-widest">Admin Dashboard</p>
           <h1 className="text-lg font-bold flex items-center gap-2">
-            Admin Dashboard
+            <span>
+              <span className="font-bold text-stone-900">TeaCorp</span><span className="text-brand-400 font-bold">Hotels</span>
+            </span>
             {overdueCount > 0 && (
               <span className="bg-red-500 text-white text-xs font-bold rounded-full px-2 py-0.5">
                 {overdueCount} overdue
@@ -286,13 +233,13 @@ export default function AdminDashboard() {
           </h1>
         </div>
         <div className="flex items-center gap-3">
-          <a href="/staff" className="text-xs opacity-60 hover:opacity-100 transition-opacity">
+          <a href="/staff" className="text-xs text-stone-500 hover:text-stone-800 transition-opacity">
             Staff view
           </a>
-          <span className="text-xs opacity-60">{adminName}</span>
+          <span className="text-xs text-stone-500">{adminName}</span>
           <button
-            onClick={async () => { await supabase.auth.signOut(); router.push("/staff/login"); }}
-            className="text-xs opacity-60 hover:opacity-100 transition-opacity"
+            onClick={async () => { await supabase.auth.signOut(); window.location.href = "/staff/login"; }}
+            className="text-xs text-stone-500 hover:text-stone-800 transition-opacity"
           >
             Sign out
           </button>
@@ -355,7 +302,7 @@ export default function AdminDashboard() {
               No active requests right now.
             </div>
           ) : (
-            <div className="space-y-3" key={tick}>
+            <div className="space-y-3">
               {sortedActive.map((req) => (
                 <ActiveRequestRow
                   key={req.id}

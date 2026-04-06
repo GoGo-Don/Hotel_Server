@@ -27,11 +27,11 @@ export default function LoginPage() {
   };
 
   return (
-    <main className="min-h-screen flex flex-col bg-stone-100">
+    <main className="min-h-screen flex flex-col bg-[#F3F5F8]">
       {/* Top zone — wordmark pinned near top */}
       <div className="flex flex-col items-center pt-14 pb-6">
-        <div className="text-4xl mb-3">🏨</div>
-        <p className="text-2xl font-bold text-brand-600">Grand Stay Hotel</p>
+        <span className="font-bold text-2xl text-stone-900 tracking-tight">TeaCorp<span className="text-brand-400">Hotels</span></span>
+        <p className="text-[10px] font-medium text-stone-400 uppercase tracking-widest mt-1">Bangalore · Corporate Hotels</p>
       </div>
 
       {/* Middle zone — card takes remaining space, centred */}
@@ -39,7 +39,7 @@ export default function LoginPage() {
         <div className="w-full max-w-sm bg-white rounded-2xl shadow-lg p-8 space-y-6">
           <div className="text-center">
             <h1 className="text-xl font-bold text-stone-800">Staff Login</h1>
-            <p className="text-brand-600 text-sm font-medium mt-1">Grand Stay Hotel</p>
+            <p className="text-brand-400 text-sm font-medium mt-1">TeaCorp Hotels</p>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-4">
@@ -52,7 +52,7 @@ export default function LoginPage() {
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="w-full px-4 py-2.5 rounded-xl border border-stone-200 focus:outline-none focus:ring-2 focus:ring-brand-500 text-sm"
+                className="w-full px-4 py-2.5 rounded-xl border border-stone-200 focus:outline-none focus:ring-2 focus:ring-brand-400 text-sm"
                 placeholder="you@hotel.com"
               />
             </div>
@@ -66,7 +66,7 @@ export default function LoginPage() {
                 required
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full px-4 py-2.5 rounded-xl border border-stone-200 focus:outline-none focus:ring-2 focus:ring-brand-500 text-sm"
+                className="w-full px-4 py-2.5 rounded-xl border border-stone-200 focus:outline-none focus:ring-2 focus:ring-brand-400 text-sm"
                 placeholder="••••••••"
               />
             </div>
@@ -80,7 +80,7 @@ export default function LoginPage() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full bg-brand-600 hover:bg-brand-700 text-white font-semibold py-2.5 rounded-xl transition-colors disabled:opacity-60"
+              className="w-full bg-brand-400 hover:bg-brand-500 text-white font-semibold py-2.5 rounded-xl transition-colors disabled:opacity-60"
             >
               {loading ? "Signing in..." : "Sign in"}
             </button>
@@ -90,7 +90,7 @@ export default function LoginPage() {
 
       {/* Bottom zone — footer */}
       <div className="py-6 text-center">
-        <p className="text-stone-400 text-xs">Grand Stay Hotel &mdash; Staff Portal</p>
+        <p className="text-stone-400 text-xs">TeaCorp Hotels Staff Portal &middot; Bangalore</p>
       </div>
     </main>
   );

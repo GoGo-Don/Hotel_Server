@@ -6,7 +6,14 @@ export type RequestType =
   | "cleaning"
   | "extra_pillows"
   | "reception_callback"
-  | "maintenance";
+  | "maintenance"
+  | "tea_coffee"
+  | "breakfast_order"
+  | "wake_up_call"
+  | "work_desk_setup"
+  | "wifi_help"
+  | "extra_towels"
+  | "room_cleaning";
 
 export interface ServiceRequest {
   id: string;
@@ -27,42 +34,21 @@ export interface RequestTypeConfig {
 }
 
 export const REQUEST_TYPES: RequestTypeConfig[] = [
-  {
-    type: "water",
-    label: "Water",
-    icon: "💧",
-    description: "Bottled water delivered to your room",
-  },
-  {
-    type: "towels",
-    label: "Towels",
-    icon: "🛁",
-    description: "Fresh towels replacement",
-  },
-  {
-    type: "cleaning",
-    label: "Room Cleaning",
-    icon: "🧹",
-    description: "Housekeeping service",
-  },
-  {
-    type: "extra_pillows",
-    label: "Extra Pillows",
-    icon: "🛏️",
-    description: "Additional pillows or bedding",
-  },
-  {
-    type: "reception_callback",
-    label: "Reception Callback",
-    icon: "📞",
-    description: "We'll call your room within 5 minutes.",
-  },
+  { type: "tea_coffee",         label: "Tea & Coffee",    icon: "Coffee",          description: "Hot beverages from your in-room kettle" },
+  { type: "water",              label: "Water",           icon: "Droplets",        description: "Bottled water delivered to your room" },
+  { type: "extra_towels",       label: "Extra Towels",    icon: "Bath",            description: "Fresh towels delivered promptly" },
+  { type: "room_cleaning",      label: "Room Cleaning",   icon: "Sparkles",        description: "We'll freshen up your room" },
+  { type: "wake_up_call",       label: "Wake-up Call",    icon: "AlarmClock",      description: "Tell us your preferred time at reception" },
+  { type: "work_desk_setup",    label: "Work Desk",       icon: "Monitor",         description: "Arrange your workspace to your needs" },
+  { type: "breakfast_order",    label: "Breakfast",       icon: "UtensilsCrossed", description: "Fresh homemade breakfast, served daily" },
+  { type: "reception_callback", label: "Call Reception",  icon: "Phone",           description: "We'll call your room within 5 minutes" },
+  { type: "wifi_help",          label: "WiFi Help",       icon: "Wifi",            description: "Connectivity support from our team" },
 ];
 
 // Kept for display of legacy DB rows — not shown on guest page
 export const LEGACY_REQUEST_TYPES: RequestTypeConfig[] = [
   {
-    type: "maintenance" as RequestType,
+    type: "maintenance",
     label: "Maintenance",
     icon: "🔧",
     description: "Technical issue reported",
@@ -73,10 +59,9 @@ export const LEGACY_REQUEST_TYPES: RequestTypeConfig[] = [
 // Edit this list to match your hotel's team.
 export const STAFF_ROSTER = [
   "Reception",
-  "Maria H.",
-  "John K.",
-  "Anna R.",
-  "Sam T.",
+  "Housekeeping",
+  "F&B",
+  "Maintenance",
   "Night Manager",
 ];
 

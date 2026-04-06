@@ -1,20 +1,11 @@
 "use client";
 
 import { useEffect, useState, useCallback, useRef } from "react";
-import { useRouter } from "next/navigation";
-import { supabase, fetchActiveRequests, fetchTodayRequests, claimRequest, resolveRequest } from "@/lib/supabase";
-import { type ServiceRequest, REQUEST_TYPES, LEGACY_REQUEST_TYPES } from "@/lib/types";
-
-function timeAgo(dateStr: string): string {
-  const diff = Math.floor((Date.now() - new Date(dateStr).getTime()) / 1000);
-  if (diff < 60) return `${diff}s ago`;
-  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
-  return `${Math.floor(diff / 3600)}h ago`;
-}
-
-function isOverdue(dateStr: string): boolean {
-  return Date.now() - new Date(dateStr).getTime() > 10 * 60 * 1000; // 10 minutes
-}
+import { supabase, fetchActiveRequests, fetchTodayRequests, assignRequest, resolveRequest } from "@/lib/supabase";
+import { type ServiceRequest } from "@/lib/types";
+import { StatusBadge } from "@/components/StatusBadge";
+import { useAuthSession } from "@/lib/hooks/useAuthSession";
+import { timeAgo, isOverdue, getConfig } from "@/lib/utils";
 
 function sortRequests(list: ServiceRequest[]): ServiceRequest[] {
   // Overdue pending first (oldest first within group), then rest by created_at ascending
@@ -31,22 +22,25 @@ function sortRequests(list: ServiceRequest[]): ServiceRequest[] {
 
 function RequestCard({
   req,
+  tick,
   staffName,
   onClaim,
   onResolve,
 }: {
   req: ServiceRequest;
+  tick: number;
   staffName: string;
   onClaim: (id: string) => void;
   onResolve: (id: string) => void;
 }) {
-  const config = [...REQUEST_TYPES, ...LEGACY_REQUEST_TYPES].find((r) => r.type === req.type);
+  void tick; // used to trigger re-render for timeAgo freshness
+  const config = getConfig(req.type);
   const overdue = req.status === "pending" && isOverdue(req.created_at);
 
   return (
     <div
       className={`bg-white rounded-2xl border-2 p-4 space-y-3 transition-all
-        ${req.status === "pending" ? (overdue ? "border-red-300" : "border-brand-300") : "border-stone-200"}
+        ${req.status === "pending" ? (overdue ? "border-red-300" : "border-brand-200") : "border-stone-200"}
         ${req.status === "in_progress" ? "border-amber-300" : ""}
       `}
     >
@@ -87,7 +81,7 @@ function RequestCard({
         {req.status === "pending" && (
           <button
             onClick={() => onClaim(req.id)}
-            className="flex-1 text-sm bg-brand-600 hover:bg-brand-700 text-white font-medium py-2 rounded-xl transition-colors"
+            className="flex-1 text-sm bg-brand-400 hover:bg-brand-500 text-white font-medium py-2 rounded-xl transition-colors"
           >
             Claim
           </button>
@@ -105,29 +99,9 @@ function RequestCard({
   );
 }
 
-function StatusBadge({ status }: { status: ServiceRequest["status"] }) {
-  const styles: Record<ServiceRequest["status"], string> = {
-    pending: "bg-brand-100 text-brand-700",
-    in_progress: "bg-amber-100 text-amber-700",
-    done: "bg-green-100 text-green-700",
-  };
-  const labels: Record<ServiceRequest["status"], string> = {
-    pending: "Pending",
-    in_progress: "In Progress",
-    done: "Done",
-  };
-  return (
-    <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${styles[status]}`}>
-      {labels[status]}
-    </span>
-  );
-}
-
 export default function StaffDashboard() {
-  const router = useRouter();
+  const { name: staffName, loading } = useAuthSession();
   const [requests, setRequests] = useState<ServiceRequest[]>([]);
-  const [staffName, setStaffName] = useState("Staff");
-  const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<"active" | "all">("active");
   const [tick, setTick] = useState(0); // force re-render for timeAgo
   const [soundEnabled, setSoundEnabled] = useState(false);
@@ -138,23 +112,6 @@ export default function StaffDashboard() {
     const interval = setInterval(() => setTick((t) => t + 1), 30_000);
     return () => clearInterval(interval);
   }, []);
-
-  // Auth check — Item 8: format display name from email
-  useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (!session) {
-        router.push("/staff/login");
-      } else {
-        const raw = session.user.email?.split("@")[0] ?? "Staff";
-        const name = raw
-          .split(/[._-]/)
-          .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
-          .join(" ");
-        setStaffName(name);
-        setLoading(false);
-      }
-    });
-  }, [router]);
 
   // Load requests based on active filter
   const loadRequests = useCallback(async () => {
@@ -214,7 +171,7 @@ export default function StaffDashboard() {
         )
       )
     );
-    await claimRequest(id, staffName);
+    await assignRequest(id, staffName);
   };
 
   const handleResolve = async (id: string) => {
@@ -226,7 +183,7 @@ export default function StaffDashboard() {
 
   const handleSignOut = async () => {
     await supabase.auth.signOut();
-    router.push("/staff/login");
+    window.location.href = "/staff/login";
   };
 
   if (loading) {
@@ -248,13 +205,15 @@ export default function StaffDashboard() {
   ).length;
 
   return (
-    <main className="min-h-screen bg-stone-100">
+    <main className="min-h-screen bg-[#F3F5F8]">
       {/* Header */}
-      <header className="bg-brand-700 text-white px-5 py-4 flex items-center justify-between shadow-md sticky top-0 z-10">
+      <header className="bg-white border-b-[3px] border-brand-400 px-5 py-4 sticky top-0 z-10 shadow-sm flex items-center justify-between">
         <div>
-          <p className="text-brand-200 text-xs font-medium">Grand Stay Hotel</p>
+          <p className="text-[10px] font-medium text-stone-400 uppercase tracking-widest">Staff Dashboard</p>
           <h1 className="text-lg font-bold flex items-center gap-2">
-            Requests
+            <span>
+              <span className="font-bold text-stone-900">TeaCorp</span><span className="text-brand-400 font-bold">Hotels</span>
+            </span>
             {pendingCount > 0 && (
               <span className="bg-red-500 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">
                 {pendingCount}
@@ -263,7 +222,7 @@ export default function StaffDashboard() {
           </h1>
         </div>
         <div className="flex items-center gap-3">
-          {/* Sound toggle — Item 4 */}
+          {/* Sound toggle */}
           <button
             onClick={() => setSoundEnabled((v) => !v)}
             title={soundEnabled ? "Sound alerts on" : "Sound alerts off"}
@@ -271,13 +230,13 @@ export default function StaffDashboard() {
           >
             🔔
           </button>
-          <a href="/admin" className="text-xs text-brand-200 hover:text-white transition-colors hidden sm:block">
+          <a href="/admin" className="text-xs text-stone-500 hover:text-stone-800 transition-colors hidden sm:block">
             Admin
           </a>
-          <span className="text-brand-200 text-xs hidden sm:block">{staffName}</span>
+          <span className="text-stone-500 text-xs hidden sm:block">{staffName}</span>
           <button
             onClick={handleSignOut}
-            className="text-xs text-brand-200 hover:text-white transition-colors"
+            className="text-xs text-stone-500 hover:text-stone-800 transition-colors"
           >
             Sign out
           </button>
@@ -289,7 +248,7 @@ export default function StaffDashboard() {
         <button
           onClick={() => setFilter("active")}
           className={`px-4 py-1.5 rounded-full text-sm font-medium transition-colors
-            ${filter === "active" ? "bg-brand-600 text-white" : "bg-white text-stone-600 border border-stone-200"}`}
+            ${filter === "active" ? "bg-brand-400 text-white" : "bg-white text-stone-600 border border-stone-200"}`}
         >
           Active
           {overdueCount > 0 && filter === "active" && (
@@ -301,7 +260,7 @@ export default function StaffDashboard() {
         <button
           onClick={() => setFilter("all")}
           className={`px-4 py-1.5 rounded-full text-sm font-medium transition-colors
-            ${filter === "all" ? "bg-brand-600 text-white" : "bg-white text-stone-600 border border-stone-200"}`}
+            ${filter === "all" ? "bg-brand-400 text-white" : "bg-white text-stone-600 border border-stone-200"}`}
         >
           All today
         </button>
@@ -316,8 +275,9 @@ export default function StaffDashboard() {
         ) : (
           visibleRequests.map((req) => (
             <RequestCard
-              key={req.id + tick}
+              key={req.id}
               req={req}
+              tick={tick}
               staffName={staffName}
               onClaim={handleClaim}
               onResolve={handleResolve}

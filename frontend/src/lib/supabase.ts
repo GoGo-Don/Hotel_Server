@@ -33,7 +33,7 @@ export async function insertRequest(
   room: string,
   type: string,
   notes?: string
-): Promise<{ data: ServiceRequest | null; error: string | null }> {
+): Promise<{ error: string | null }> {
   try {
     // No .select() — anon role has INSERT but not SELECT via RLS.
     // We only need to know if the insert succeeded, not the returned row.
@@ -44,13 +44,13 @@ export async function insertRequest(
     if (error) {
       // Unique constraint violation = duplicate pending request
       if (error.code === "23505") {
-        return { data: null, error: "duplicate" };
+        return { error: "duplicate" };
       }
-      return { data: null, error: error.message };
+      return { error: error.message };
     }
-    return { data: null, error: null };
+    return { error: null };
   } catch (err) {
-    return { data: null, error: err instanceof Error ? err.message : "Unknown error" };
+    return { error: err instanceof Error ? err.message : "Unknown error" };
   }
 }
 
@@ -84,20 +84,10 @@ export async function fetchTodayRequests(): Promise<ServiceRequest[]> {
   return (data ?? []) as ServiceRequest[];
 }
 
-export async function claimRequest(
-  id: string,
-  staffName: string
-): Promise<void> {
-  await supabase
-    .from("requests")
-    .update({ status: "in_progress", assigned_to: staffName, updated_at: new Date().toISOString() })
-    .eq("id", id);
-}
-
 export async function resolveRequest(id: string): Promise<void> {
   await supabase
     .from("requests")
-    .update({ status: "done", updated_at: new Date().toISOString() })
+    .update({ status: "done" })
     .eq("id", id);
 }
 
@@ -110,31 +100,28 @@ export async function assignRequest(
     .update({
       assigned_to: staffName,
       status: "in_progress",
-      updated_at: new Date().toISOString(),
     })
     .eq("id", id);
 }
 
 export async function fetchStats(): Promise<import("./types").AdminStats> {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const { data } = await getSupabase()
-    .from("requests")
-    .select("*")
-    .gte("created_at", today.toISOString());
-
-  const all = (data ?? []) as ServiceRequest[];
+  const { data, error } = await getSupabase().rpc("get_today_stats");
+  if (!error && data?.[0]) {
+    const r = data[0];
+    return {
+      total: Number(r.total),
+      pending: Number(r.pending),
+      inProgress: Number(r.in_progress),
+      done: Number(r.done),
+      avgCompletionMins: Number(r.avg_completion_mins ?? 0),
+    };
+  }
+  // Fallback: client-side aggregation
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const { data: rows } = await getSupabase().from("requests").select("*").gte("created_at", today.toISOString());
+  const all = (rows ?? []) as ServiceRequest[];
   const done = all.filter((r) => r.status === "done");
-  const times = done
-    .map((r) => new Date(r.updated_at).getTime() - new Date(r.created_at).getTime())
-    .filter((t) => t > 0);
+  const times = done.map((r) => new Date(r.updated_at).getTime() - new Date(r.created_at).getTime()).filter((t) => t > 0 && t < 4 * 3600000);
   const avgMs = times.length ? times.reduce((a, b) => a + b, 0) / times.length : 0;
-
-  return {
-    total: all.length,
-    pending: all.filter((r) => r.status === "pending").length,
-    inProgress: all.filter((r) => r.status === "in_progress").length,
-    done: done.length,
-    avgCompletionMins: Math.round(avgMs / 60000),
-  };
+  return { total: all.length, pending: all.filter((r) => r.status === "pending").length, inProgress: all.filter((r) => r.status === "in_progress").length, done: done.length, avgCompletionMins: Math.round(avgMs / 60000) };
 }
