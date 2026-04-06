@@ -11,10 +11,12 @@ import {
   fetchUnassignedRequests,
   fetchActiveRequests,
   fetchTodayRequests,
+  fetchStaffProfiles,
   assignRequest,
   resolveRequest,
+  type StaffProfile,
 } from "@/lib/supabase";
-import { type ServiceRequest, STAFF_ROSTER } from "@/lib/types";
+import { type ServiceRequest } from "@/lib/types";
 import { StatusBadge } from "@/components/StatusBadge";
 import { useAuthSession } from "@/lib/hooks/useAuthSession";
 import { timeAgo, isOverdue, getConfig } from "@/lib/utils";
@@ -35,11 +37,46 @@ function RequestIcon({ type, size = 16 }: { type: string; size?: number }) {
 
 // ─── Unassigned request card ──────────────────────────────────────────────────
 
+function StaffSelect({
+  staff,
+  currentName,
+  onChange,
+  size = "normal",
+}: {
+  staff: StaffProfile[];
+  currentName?: string | null;
+  onChange: (name: string) => void;
+  size?: "normal" | "small";
+}) {
+  if (staff.length === 0) {
+    return (
+      <p className="text-xs text-stone-400 italic">No staff profiles found — add them in Supabase.</p>
+    );
+  }
+  const base = size === "small"
+    ? "text-xs border border-stone-200 rounded-lg px-2 py-1.5 focus:ring-1 focus:ring-brand-400"
+    : "w-full text-sm border-2 border-brand-200 rounded-xl px-3 py-2.5 focus:border-brand-400 font-medium";
+  return (
+    <select
+      defaultValue=""
+      onChange={(e) => { if (e.target.value) { onChange(e.target.value); e.target.value = ""; } }}
+      className={`bg-white text-stone-700 focus:outline-none ${base}`}
+    >
+      <option value="" disabled>{currentName ? "Reassign…" : "Assign to…"}</option>
+      {staff.map((s) => (
+        <option key={s.id} value={s.display_name}>{s.display_name}</option>
+      ))}
+    </select>
+  );
+}
+
 function UnassignedCard({
   req,
+  staff,
   onAssign,
 }: {
   req: ServiceRequest;
+  staff: StaffProfile[];
   onAssign: (id: string, staff: string) => void;
 }) {
   const config = getConfig(req.type);
@@ -68,20 +105,7 @@ function UnassignedCard({
         </p>
       )}
 
-      <select
-        defaultValue=""
-        onChange={(e) => {
-          if (e.target.value) onAssign(req.id, e.target.value);
-          e.target.value = "";
-        }}
-        className="w-full text-sm border-2 border-brand-200 rounded-xl px-3 py-2.5 bg-white text-stone-700
-          focus:outline-none focus:border-brand-400 font-medium"
-      >
-        <option value="" disabled>Assign to staff member…</option>
-        {STAFF_ROSTER.map((name) => (
-          <option key={name} value={name}>{name}</option>
-        ))}
-      </select>
+      <StaffSelect staff={staff} onChange={(name) => onAssign(req.id, name)} />
     </div>
   );
 }
@@ -90,10 +114,12 @@ function UnassignedCard({
 
 function InProgressCard({
   req,
+  staff,
   onDone,
   onReassign,
 }: {
   req: ServiceRequest;
+  staff: StaffProfile[];
   onDone: (id: string) => void;
   onReassign: (id: string, staff: string) => void;
 }) {
@@ -125,20 +151,7 @@ function InProgressCard({
           → <strong className="text-stone-700">{req.assigned_to}</strong>
         </span>
         <div className="flex-1" />
-        <select
-          defaultValue=""
-          onChange={(e) => {
-            if (e.target.value) onReassign(req.id, e.target.value);
-            e.target.value = "";
-          }}
-          className="text-xs border border-stone-200 rounded-lg px-2 py-1.5 bg-white text-stone-600
-            focus:outline-none focus:ring-1 focus:ring-brand-400"
-        >
-          <option value="" disabled>Reassign…</option>
-          {STAFF_ROSTER.map((name) => (
-            <option key={name} value={name}>{name}</option>
-          ))}
-        </select>
+        <StaffSelect staff={staff} currentName={req.assigned_to} size="small" onChange={(name) => onReassign(req.id, name)} />
         <button
           onClick={() => onDone(req.id)}
           className="shrink-0 text-xs bg-teal-500 hover:bg-teal-600 text-white font-semibold px-3 py-1.5 rounded-lg transition-colors"
@@ -152,10 +165,10 @@ function InProgressCard({
 
 // ─── Staff workload pill ───────────────────────────────────────────────────────
 
-function WorkloadBar({ requests }: { requests: ServiceRequest[] }) {
-  const counts = STAFF_ROSTER.map((name) => ({
-    name,
-    count: requests.filter((r) => r.assigned_to === name && r.status === "in_progress").length,
+function WorkloadBar({ requests, staff }: { requests: ServiceRequest[]; staff: StaffProfile[] }) {
+  const counts = staff.map((s) => ({
+    name: s.display_name,
+    count: requests.filter((r) => r.assigned_to === s.display_name && r.status === "in_progress").length,
   }));
 
   return (
@@ -189,6 +202,7 @@ export default function ManagerDashboard() {
   const [unassigned, setUnassigned] = useState<ServiceRequest[]>([]);
   const [active, setActive] = useState<ServiceRequest[]>([]);
   const [done, setDone] = useState<ServiceRequest[]>([]);
+  const [staff, setStaff] = useState<StaffProfile[]>([]);
   const [tick, setTick] = useState(0);
 
   useEffect(() => {
@@ -197,14 +211,16 @@ export default function ManagerDashboard() {
   }, []);
 
   const refresh = useCallback(async () => {
-    const [unassignedData, allActive, todayAll] = await Promise.all([
+    const [unassignedData, allActive, todayAll, staffData] = await Promise.all([
       fetchUnassignedRequests(),
       fetchActiveRequests(),
       fetchTodayRequests(),
+      fetchStaffProfiles(),
     ]);
     setUnassigned(unassignedData);
     setActive(allActive.filter((r) => r.status === "in_progress"));
     setDone(todayAll.filter((r) => r.status === "done"));
+    setStaff(staffData);
   }, []);
 
   useEffect(() => {
@@ -280,7 +296,7 @@ export default function ManagerDashboard() {
       <div className="p-4 space-y-5 pb-10" key={tick}>
 
         {/* Workload bar */}
-        <WorkloadBar requests={active} />
+        <WorkloadBar requests={active} staff={staff} />
 
         {/* Unassigned queue */}
         <section>
@@ -298,7 +314,7 @@ export default function ManagerDashboard() {
           ) : (
             <div className="space-y-3">
               {unassigned.map((req) => (
-                <UnassignedCard key={req.id} req={req} onAssign={handleAssign} />
+                <UnassignedCard key={req.id} req={req} staff={staff} onAssign={handleAssign} />
               ))}
             </div>
           )}
@@ -316,6 +332,7 @@ export default function ManagerDashboard() {
                 <InProgressCard
                   key={req.id}
                   req={req}
+                  staff={staff}
                   onDone={handleDone}
                   onReassign={handleAssign}
                 />

@@ -136,6 +136,33 @@ export async function assignRequest(
     .eq("id", id);
 }
 
+export type StaffProfile = { id: string; display_name: string; email: string; role: string };
+
+export async function fetchStaffProfiles(): Promise<StaffProfile[]> {
+  const { data, error } = await getSupabase()
+    .from("profiles")
+    .select("id, display_name, email, role")
+    .eq("role", "staff")
+    .order("display_name");
+
+  if (error) {
+    console.error("fetchStaffProfiles:", error.message);
+    return [];
+  }
+  return (data ?? []) as StaffProfile[];
+}
+
+export async function fetchMyProfile(): Promise<StaffProfile | null> {
+  const { data: { session } } = await getSupabase().auth.getSession();
+  if (!session) return null;
+  const { data } = await getSupabase()
+    .from("profiles")
+    .select("id, display_name, email, role")
+    .eq("id", session.user.id)
+    .single();
+  return data as StaffProfile | null;
+}
+
 export async function fetchStats(): Promise<import("./types").AdminStats> {
   const { data, error } = await getSupabase().rpc("get_today_stats");
   if (!error && data?.[0]) {
