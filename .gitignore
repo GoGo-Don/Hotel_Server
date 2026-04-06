@@ -1,0 +1,25 @@
+# Environment & secrets
+.env
+.env.local
+.env.*.local
+.envrc
+
+# Python virtual environment
+.venv/
+venv/
+__pycache__/
+*.pyc
+
+# Personal / private notes
+*_bisht.md
+
+# Node
+frontend/node_modules/
+frontend/.next/
+
+# QR code output
+scripts/qr_output/
+
+# OS
+.DS_Store
+Thumbs.db
